@@ -1,0 +1,482 @@
+<!DOCTYPE html>
+<html lang="pl">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Asystent Korespondencji Firmowej</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <style>
+        body {
+            font-family: 'Inter', sans-serif;
+        }
+        .prose-custom ul {
+            list-style-position: inside;
+        }
+        .prose-custom ul li {
+            margin-bottom: 0.5em;
+        }
+        .loader {
+            border: 4px solid #f3f3f3;
+            border-top: 4px solid #3498db;
+            border-radius: 50%;
+            width: 40px;
+            height: 40px;
+            animation: spin 1s linear infinite;
+        }
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+        .feedback-card {
+            transition: all 0.3s ease-in-out;
+            opacity: 0;
+            transform: translateY(20px);
+        }
+        .feedback-card.visible {
+            opacity: 1;
+            transform: translateY(0);
+        }
+        #voice-status.listening {
+            color: #dc2626; /* red-600 */
+            font-weight: 600;
+        }
+        .form-select {
+            background-image: url("data:image/svg+xml,%3csvg xmlns='http://www.w3.org/2000/svg' fill='none' viewBox='0 0 20 20'%3e%3cpath stroke='%236b7280' stroke-linecap='round' stroke-linejoin='round' stroke-width='1.5' d='M6 8l4 4 4-4'/%3e%3c/svg%3e");
+            background-position: right 0.5rem center;
+            background-repeat: no-repeat;
+            background-size: 1.5em 1.5em;
+            padding-right: 2.5rem;
+            -webkit-appearance: none;
+            -moz-appearance: none;
+            appearance: none;
+        }
+        .gemini-feature-button {
+            background-color: #eef2ff; /* indigo-50 */
+            color: #4338ca; /* indigo-700 */
+            border: 1px solid #c7d2fe; /* indigo-200 */
+        }
+        .gemini-feature-button:hover {
+            background-color: #e0e7ff; /* indigo-100 */
+        }
+    </style>
+</head>
+<body class="bg-gray-50 text-gray-800">
+
+    <div class="container mx-auto p-4 md:p-8">
+        <!-- Nagłówek -->
+        <header class="text-center mb-8">
+            <h1 class="text-4xl md:text-5xl font-bold text-gray-900">Asystent Korespondencji Firmowej</h1>
+            <p class="mt-2 text-lg text-gray-600">Podaj szczegóły, a ja przygotuję profesjonalną wiadomość.</p>
+        </header>
+
+        <div class="bg-white p-6 rounded-2xl shadow-lg">
+            <!-- Główny interfejs -->
+            <div class="grid grid-cols-1 lg:grid-cols-2 gap-8">
+                <!-- Lewa kolumna: Wprowadzanie tekstu -->
+                <div class="flex flex-col space-y-4">
+                    
+                    <div id="business-inputs" class="space-y-4">
+                        <div>
+                            <label for="business-goal" class="font-semibold text-gray-700 block mb-1">Główny cel:</label>
+                            <input type="text" id="business-goal" placeholder="np. Wniosek o urlop, Raport kwartalny" class="w-full p-3 border border-gray-300 rounded-xl focus:ring-2 focus:ring-blue-500">
+                        </div>
+                         <div>
+                            <label for="business-tone" class="font-semibold text-gray-700 block mb-1">Pożądany ton:</label>
+                            <select id="business-tone" class="w-full p-3 border border-gray-300 rounded-xl focus:ring-2 focus:ring-blue-500 form-select">
+                                <option selected>Przyjazny, ale profesjonalny</option>
+                                <option>Formalny</option>
+                                <option>Informacyjny</option>
+                                <option>Przekonujący</option>
+                                <option>Swobodny / Koleżeński</option>
+                                <option>Wersja w języku klingońskim</option>
+                            </select>
+                        </div>
+                    </div>
+
+                    <div>
+                        <label for="user-text" id="user-text-label" class="text-lg font-semibold mb-2 text-gray-700 block">Szkic lub kluczowe punkty:</label>
+                        <textarea id="user-text" class="w-full h-80 p-4 border border-gray-300 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition duration-200 resize-none" placeholder="Wpisz szkic wiadomości lub wypunktuj kluczowe informacje, które chcesz zawrzeć..."></textarea>
+                    </div>
+                    
+                    <div id="voice-status" class="text-center text-sm text-gray-500 h-5"></div>
+                    <div class="flex items-center gap-2">
+                        <button id="analyze-button" class="w-full bg-blue-600 text-white font-bold py-3 px-6 rounded-lg hover:bg-blue-700 focus:outline-none focus:ring-4 focus:ring-blue-300 transition-all duration-300 ease-in-out flex items-center justify-center disabled:bg-gray-400">
+                            <svg id="button-icon" xmlns="http://www.w3.org/2000/svg" class="h-6 w-6 mr-2" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-6 9l2 2 4-4" />
+                            </svg>
+                            <span id="button-text">Generuj korespondencję</span>
+                        </button>
+                        <button id="voice-button" class="flex-shrink-0 bg-gray-200 text-gray-700 p-3 rounded-lg hover:bg-gray-300 focus:outline-none focus:ring-4 focus:ring-gray-300 transition-all duration-300 ease-in-out">
+                            <svg id="mic-icon" xmlns="http://www.w3.org/2000/svg" class="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 11a7 7 0 01-14 0m7 7v4m0 0H8m4 0h4m-4-8a3 3 0 01-3-3V5a3 3 0 116 0v6a3 3 0 01-3 3z" />
+                            </svg>
+                        </button>
+                    </div>
+                </div>
+
+                <!-- Prawa kolumna: Wyniki analizy -->
+                <div id="results-container" class="prose-custom max-w-none">
+                    <div id="placeholder" class="h-full flex flex-col items-center justify-center text-center bg-gray-100 rounded-xl p-8">
+                         <svg xmlns="http://www.w3.org/2000/svg" class="h-16 w-16 text-gray-400 mb-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9.663 17h4.673M12 3v1m6.364 1.636l-.707.707M21 12h-1M4 12H3m3.343-5.657l-.707-.707m2.828 9.9a5 5 0 117.072 0l-.548.547A3.374 3.374 0 0014 18.469V19a2 2 0 11-4 0v-.531c0-.895-.356-1.754-.988-2.386l-.548-.547z" />
+                        </svg>
+                        <h3 class="text-xl font-semibold text-gray-700">Tutaj pojawi się gotowa wiadomość</h3>
+                        <p class="text-gray-500 mt-2">Po analizie znajdziesz tu wygenerowany tekst.</p>
+                    </div>
+                    <div id="loader-container" class="h-full hidden items-center justify-center flex-col">
+                        <div class="loader"></div>
+                        <p class="mt-4 text-gray-600">Przygotowuję wiadomość...</p>
+                    </div>
+                    <div id="feedback-content" class="hidden space-y-6"></div>
+                    <div id="extra-features-loader" class="hidden items-center justify-center mt-4">
+                        <div class="loader"></div>
+                    </div>
+                    <div id="extra-features-output" class="mt-4 space-y-4"></div>
+                </div>
+            </div>
+        </div>
+        
+        <footer class="text-center mt-8 text-sm text-gray-500">
+            <p>&copy; 2024 Asystent Korespondencji Firmowej. Wspierany przez technologię Gemini.</p>
+        </footer>
+    </div>
+
+    <script type="module">
+        const userText = document.getElementById('user-text');
+        const analyzeButton = document.getElementById('analyze-button');
+        const buttonText = document.getElementById('button-text');
+        const buttonIcon = document.getElementById('button-icon');
+        const placeholder = document.getElementById('placeholder');
+        const loaderContainer = document.getElementById('loader-container');
+        const feedbackContent = document.getElementById('feedback-content');
+        const voiceButton = document.getElementById('voice-button');
+        const voiceStatus = document.getElementById('voice-status');
+        const micIcon = document.getElementById('mic-icon');
+        const extraFeaturesLoader = document.getElementById('extra-features-loader');
+        const extraFeaturesOutput = document.getElementById('extra-features-output');
+
+        // --- Budowanie promptu dla API ---
+        function buildPrompt(mode, text, context = {}) {
+            if (mode === 'generate') {
+                const { goal, tone } = context;
+                if (tone === 'Wersja w języku klingońskim') {
+                    return `Jesteś tłumaczem z języka polskiego na klingoński. Twoim zadaniem jest przetłumaczenie poniższego tekstu lub kluczowych punktów na język klingoński (używając alfabetu łacińskiego). Zachowaj oryginalny sens i cel wiadomości.\n\nCel wiadomości: ${goal || 'nie podano'}\nSzkic / Kluczowe punkty od użytkownika (do przetłumaczenia):\n---\n${text}\n---\n`;
+                } else {
+                    return `Jesteś ekspertem ds. komunikacji biznesowej. Twoim zadaniem jest przygotowanie profesjonalnej korespondencji wewnętrznej w języku polskim. Na podstawie poniższych informacji, stwórz gotowy do wysłania tekst.\n\nCel wiadomości: ${goal || 'nie podano'}\nPożądany ton: ${tone}\nSzkic / Kluczowe punkty od użytkownika:\n---\n${text}\n---\n`;
+                }
+            }
+            if (mode === 'subject') {
+                return `Na podstawie poniższego tekstu e-maila, zaproponuj 3 profesjonalne, zwięzłe tematy wiadomości w języku polskim.\n\nTekst:\n---\n${text}\n---\n`;
+            }
+            if (mode === 'translate') {
+                return `Przetłumacz poniższy tekst na język angielski, zachowując jego profesjonalny ton i sens.\n\nTekst do tłumaczenia:\n---\n${text}\n---\n`;
+            }
+        }
+
+        // --- Logika API Gemini ---
+        async function callGemini(prompt, schema) {
+            let chatHistory = [{ role: "user", parts: [{ text: prompt }] }];
+            const payload = { 
+                contents: chatHistory,
+                generationConfig: {
+                    responseMimeType: "application/json",
+                    responseSchema: schema
+                }
+            };
+            const apiKey = ""; // Klucz API zostanie wstawiony automatycznie
+            const apiUrl = '/.netlify/functions/gemini-proxy';
+
+            try {
+                const response = await fetch(apiUrl, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(payload)
+                });
+                if (!response.ok) throw new Error(`Błąd API: ${response.status} ${response.statusText}`);
+                const result = await response.json();
+                
+                if (result.candidates?.[0]?.content?.parts?.[0]?.text) {
+                    const text = result.candidates[0].content.parts[0].text;
+                    return JSON.parse(text);
+                } else {
+                    console.error("Nieoczekiwana struktura odpowiedzi:", result);
+                    throw new Error('Nie udało się uzyskać poprawnej odpowiedzi od AI.');
+                }
+            } catch (error) {
+                console.error("Błąd podczas komunikacji z API Gemini:", error);
+                return null;
+            }
+        }
+
+        // --- Logika UI ---
+        analyzeButton.addEventListener('click', async () => {
+            if (!userText.value.trim()) {
+                alert('Proszę wprowadzić szkic wiadomości lub kluczowe punkty.');
+                return;
+            }
+            if (speechSynthesis.speaking) {
+                speechSynthesis.cancel();
+            }
+            setLoadingState(true);
+            const goal = document.getElementById('business-goal').value;
+            const tone = document.getElementById('business-tone').value;
+            const prompt = buildPrompt('generate', userText.value, { goal, tone });
+            const schema = { type: "OBJECT", properties: { "draftedText": { "type": "STRING" } } };
+            const feedback = await callGemini(prompt, schema);
+            setLoadingState(false);
+
+            if (feedback && feedback.draftedText) {
+                displayFeedback(feedback);
+            } else {
+                displayError();
+            }
+        });
+        
+        function setLoadingState(isLoading) {
+            analyzeButton.disabled = isLoading;
+            voiceButton.disabled = isLoading;
+            if (isLoading) {
+                buttonText.textContent = 'Przetwarzam...';
+                buttonIcon.innerHTML = `<svg class="animate-spin h-5 w-5 mr-3" viewBox="0 0 24 24"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path></svg>`;
+                placeholder.classList.add('hidden');
+                feedbackContent.classList.add('hidden');
+                extraFeaturesOutput.innerHTML = '';
+                loaderContainer.classList.remove('hidden');
+                loaderContainer.classList.add('flex');
+            } else {
+                buttonText.textContent = 'Generuj korespondencję';
+                buttonIcon.innerHTML = `<svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6 mr-2" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-6 9l2 2 4-4" /></svg>`;
+                loaderContainer.classList.add('hidden');
+                loaderContainer.classList.remove('flex');
+            }
+        }
+
+        function displayError() {
+            placeholder.classList.remove('hidden');
+            placeholder.innerHTML = `
+                 <svg xmlns="http://www.w3.org/2000/svg" class="h-16 w-16 text-red-400 mb-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>
+                 <h3 class="text-xl font-semibold text-red-700">Wystąpił błąd</h3>
+                 <p class="text-gray-500 mt-2">Nie udało się wygenerować wiadomości. Spróbuj ponownie później.</p>
+            `;
+        }
+
+        function createFeedbackCard(title, content, iconSvg) {
+            if (!content) return '';
+            return `
+                <div class="feedback-card bg-gray-50 p-5 rounded-xl border border-gray-200">
+                    <h3 class="text-xl font-semibold text-gray-800 mb-3 flex items-center">
+                        ${iconSvg}
+                        <span class="ml-2">${title}</span>
+                    </h3>
+                    <div class="text-gray-700 space-y-2">${content}</div>
+                </div>
+            `;
+        }
+        
+        function displayFeedback(data) {
+            feedbackContent.innerHTML = '';
+            
+            const draftIcon = `<svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6 text-blue-500" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" /></svg>`;
+            
+            const draftContent = `
+                <div class="relative">
+                    <textarea id="drafted-text-area" readonly class="w-full h-96 p-3 bg-white border border-gray-200 rounded-lg resize-none">${data.draftedText}</textarea>
+                    <div class="absolute top-2 right-2 flex gap-2">
+                        <button onclick="handleReadAloud(this)" title="Czytaj na głos" class="bg-gray-200 text-gray-700 p-2 rounded-md hover:bg-gray-300 transition">
+                            <svg class="h-4 w-4" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor">
+                                <path stroke-linecap="round" stroke-linejoin="round" d="M19.114 5.636a9 9 0 010 12.728M16.463 8.288a5.25 5.25 0 010 7.424M6.75 8.25l4.72-4.72a.75.75 0 011.28.53v15.88a.75.75 0 01-1.28.53l-4.72-4.72H4.51c-.88 0-1.704-.507-1.938-1.354A9.01 9.01 0 012.25 12c0-.83.112-1.633.322-2.396C2.806 8.756 3.63 8.25 4.51 8.25H6.75z" />
+                            </svg>
+                        </button>
+                        <button onclick="copyText(this.parentElement.previousElementSibling)" title="Kopiuj" class="bg-gray-200 text-gray-700 px-3 py-1 rounded-md text-sm font-medium hover:bg-gray-300 transition">Kopiuj</button>
+                    </div>
+                </div>
+                <div class="flex flex-col sm:flex-row gap-2 mt-4">
+                    <button id="suggest-subject-btn" class="gemini-feature-button w-full text-sm font-semibold py-2 px-4 rounded-lg transition">✨ Zaproponuj Temat</button>
+                    <button id="translate-btn" class="gemini-feature-button w-full text-sm font-semibold py-2 px-4 rounded-lg transition">🇬🇧 Przetłumacz na Angielski</button>
+                </div>`;
+            feedbackContent.innerHTML += createFeedbackCard('Sugerowana korespondencja', draftContent, draftIcon);
+
+            feedbackContent.classList.remove('hidden');
+            placeholder.classList.add('hidden');
+            
+            const card = feedbackContent.querySelector('.feedback-card');
+            setTimeout(() => card.classList.add('visible'), 100);
+
+            document.getElementById('suggest-subject-btn').addEventListener('click', handleSuggestSubject);
+            document.getElementById('translate-btn').addEventListener('click', handleTranslateToEnglish);
+        }
+        
+        async function handleSuggestSubject() {
+            const emailText = document.getElementById('drafted-text-area').value;
+            if (!emailText) return;
+
+            extraFeaturesLoader.style.display = 'flex';
+            extraFeaturesOutput.innerHTML = '';
+            
+            const prompt = buildPrompt('subject', emailText);
+            const schema = { type: "OBJECT", properties: { "subjects": { "type": "ARRAY", "items": { "type": "STRING" } } } };
+            const result = await callGemini(prompt, schema);
+            
+            extraFeaturesLoader.style.display = 'none';
+            if (result && result.subjects) {
+                const titleIcon = `<svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6 text-purple-500" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 10V3L4 14h7v7l9-11h-7z" /></svg>`;
+                const content = `<ul class="list-disc list-inside">${result.subjects.map(t => `<li>${t}</li>`).join('')}</ul>`;
+                extraFeaturesOutput.innerHTML = createFeedbackCard('Propozycje tematów', content, titleIcon);
+                setTimeout(() => extraFeaturesOutput.querySelector('.feedback-card').classList.add('visible'), 50);
+            }
+        }
+
+        async function handleTranslateToEnglish() {
+            const emailText = document.getElementById('drafted-text-area').value;
+            if (!emailText) return;
+            
+            extraFeaturesLoader.style.display = 'flex';
+            extraFeaturesOutput.innerHTML = '';
+
+            const prompt = buildPrompt('translate', emailText);
+            const schema = { type: "OBJECT", properties: { "translatedText": { "type": "STRING" } } };
+            const result = await callGemini(prompt, schema);
+
+            extraFeaturesLoader.style.display = 'none';
+            if (result && result.translatedText) {
+                const translateIcon = `<svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6 text-green-500" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 5h12M9 3v2m4 13h4m-4-4h4m-4-4h4M3 21h18M3 17h18M3 13h18M3 9h18" /></svg>`;
+                const content = `
+                    <div class="relative">
+                        <textarea readonly class="w-full h-64 p-3 bg-white border border-gray-200 rounded-lg resize-none">${result.translatedText}</textarea>
+                        <button onclick="copyText(this.previousElementSibling)" title="Kopiuj" class="absolute top-2 right-2 bg-gray-200 text-gray-700 px-3 py-1 rounded-md text-sm font-medium hover:bg-gray-300 transition">Kopiuj</button>
+                    </div>`;
+                extraFeaturesOutput.innerHTML = createFeedbackCard('Tłumaczenie na angielski', content, translateIcon);
+                setTimeout(() => extraFeaturesOutput.querySelector('.feedback-card').classList.add('visible'), 50);
+            }
+        }
+        
+        // --- Logika rozpoznawania mowy ---
+        const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
+        if (SpeechRecognition) {
+            const recognition = new SpeechRecognition();
+            recognition.continuous = false;
+            recognition.lang = 'pl-PL';
+            recognition.interimResults = false;
+            recognition.maxAlternatives = 1;
+
+            voiceButton.addEventListener('click', () => recognition.start());
+            recognition.onstart = () => {
+                voiceStatus.textContent = "Słucham...";
+                voiceStatus.classList.add('listening');
+                micIcon.classList.add('text-red-500');
+                voiceButton.disabled = true;
+            };
+            recognition.onresult = (event) => {
+                userText.value += event.results[0][0].transcript + ' ';
+            };
+            recognition.onend = () => {
+                voiceStatus.textContent = "";
+                voiceStatus.classList.remove('listening');
+                micIcon.classList.remove('text-red-500');
+                voiceButton.disabled = false;
+            };
+            recognition.onerror = (event) => {
+                voiceStatus.textContent = `Błąd: ${event.error}`;
+            };
+        } else {
+            voiceButton.style.display = 'none';
+            voiceStatus.textContent = "Rozpoznawanie mowy nie jest wspierane.";
+        }
+        
+        // --- Logika lektora (Text-to-Speech) ---
+        const speakerIcon = `<svg class="h-4 w-4" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M19.114 5.636a9 9 0 010 12.728M16.463 8.288a5.25 5.25 0 010 7.424M6.75 8.25l4.72-4.72a.75.75 0 011.28.53v15.88a.75.75 0 01-1.28.53l-4.72-4.72H4.51c-.88 0-1.704-.507-1.938-1.354A9.01 9.01 0 012.25 12c0-.83.112-1.633.322-2.396C2.806 8.756 3.63 8.25 4.51 8.25H6.75z" /></svg>`;
+        const stopIcon = `<svg class="h-4 w-4" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M5.25 7.5A2.25 2.25 0 017.5 5.25h9a2.25 2.25 0 012.25 2.25v9a2.25 2.25 0 01-2.25 2.25h-9a2.25 2.25 0 01-2.25-2.25v-9z" /></svg>`;
+        
+        let voices = [];
+        function populateVoiceList() {
+            if(typeof speechSynthesis === 'undefined') {
+                return;
+            }
+            voices = speechSynthesis.getVoices();
+        }
+        
+        populateVoiceList();
+        if (typeof speechSynthesis !== 'undefined' && speechSynthesis.onvoiceschanged !== undefined) {
+            speechSynthesis.onvoiceschanged = populateVoiceList;
+        }
+
+        window.handleReadAloud = function(button) {
+            const textarea = button.closest('.relative').querySelector('textarea');
+            const textToRead = textarea.value;
+
+            if (speechSynthesis.speaking) {
+                speechSynthesis.cancel();
+                return;
+            }
+
+            if (!textToRead) return;
+
+            const utterance = new SpeechSynthesisUtterance(textToRead);
+            const selectedTone = document.getElementById('business-tone').value;
+            
+            const targetLang = (selectedTone === 'Wersja w języku klingońskim') ? 'en-US' : 'pl-PL';
+            
+            const voice = voices.find(v => v.lang === targetLang);
+            if (voice) {
+                utterance.voice = voice;
+            } else {
+                const langBase = targetLang.split('-')[0];
+                const fallbackVoice = voices.find(v => v.lang.startsWith(langBase));
+                if(fallbackVoice) {
+                    utterance.voice = fallbackVoice;
+                } else {
+                    console.warn(`Nie znaleziono głosu dla języka: ${targetLang}. Używany będzie domyślny głos przeglądarki.`);
+                }
+            }
+            utterance.lang = targetLang;
+            
+            utterance.onstart = () => {
+                button.innerHTML = stopIcon;
+                button.title = "Zatrzymaj";
+            };
+            
+            utterance.onend = () => {
+                button.innerHTML = speakerIcon;
+                button.title = "Czytaj na głos";
+            };
+
+            utterance.onerror = (event) => {
+                if (event.error === 'interrupted') {
+                    console.log("Odtwarzanie mowy zostało przerwane.");
+                } else {
+                    console.error("Wystąpił błąd syntezatora mowy:", event.error);
+                }
+                button.innerHTML = speakerIcon;
+                button.title = "Czytaj na głos";
+            };
+
+            speechSynthesis.speak(utterance);
+        };
+        
+        window.addEventListener('beforeunload', () => {
+            if (speechSynthesis.speaking) {
+                speechSynthesis.cancel();
+            }
+        });
+
+        window.copyText = function(elementToCopy) {
+            elementToCopy.select();
+            try {
+                document.execCommand('copy');
+                // Znajdź przycisk kopiowania, który jest rodzeństwem elementu nadrzędnego
+                const copyButton = elementToCopy.nextElementSibling.querySelector('button[title="Kopiuj"]') || elementToCopy.nextElementSibling;
+                if(copyButton && copyButton.tagName === 'BUTTON') {
+                    const originalText = copyButton.textContent;
+                    copyButton.textContent = 'Skopiowano!';
+                    setTimeout(() => { copyButton.textContent = originalText; }, 2000);
+                }
+            } catch (err) {
+                alert('Nie udało się skopiować tekstu.');
+            }
+        }
+    </script>
+</body>
+</html>
